@@ -43,36 +43,33 @@ typedef struct ext2_dir_entry_2 {
 } DIR;
 
 char* cp; 
-GD* gp;
 INODE* ip;
 DIR *dp;
 
-//char buff[1024]; 	// global buffer to hold 1 block 
-char bootBuff[1024]; 
 char* table = "0123456789"; 
 
 // Recursive driver for printing integers
-void rprinti(x) int x; 
-{ 
-	char c; 
-	if(x)
-	{
-		c = table[x % 10]; 
-		rprinti(x/10); 
-		putc(c); 
-	}
-}
+//void rprinti(x) int x; 
+//{ 
+	//char c; 
+	//if(x)
+	//{
+		//c = table[x % 10]; 
+		//rprinti(x/10); 
+		//putc(c); 
+	//}
+//}
 
 // Main function for printing integers 
-void printi(x) int x; 
-{
-	if(x==0) 
-	{ 
-		putc('0'); 
-		return; 
- 	}
-	rprinti(x); 
-}
+//void printi(x) int x; 
+//{
+	//if(x==0) 
+	//{ 
+		//putc('0'); 
+		//return; 
+ 	//}
+	//rprinti(x); 
+//}
 
 // Print string
 void prints(s) char* s; 
@@ -120,7 +117,7 @@ unsigned long get_ino(name, buff) char* name; char buff[];
 		cp += dp->rec_len; 			// Go to next directory 
 		dp = (DIR *)cp;
 	}
-	prints("\n\rCould not find "); prints(name); 
+	//prints("\n\rCould not find "); prints(name); 
 	return inodeNumber; 	// Returns 0 
 	
 }
@@ -142,7 +139,8 @@ void gets(s) char* s;
 
 void ShowPrompt() void; 
 {
-	prints("Enter boot image (Press Enter for default MTX): ");  
+	//prints("Enter boot image (Press Enter for default MTX): ");  
+	prints("?"); 
 }
 
 int main()
@@ -153,12 +151,11 @@ int main()
 	int nextBlock; 
 	int useDefault = 0; 	// Default: search for 'mtx' in /boot/
 	char buff[1024]; 
+	char buff2[1024]; 
+	//char buff3[1024]; 
+	u32* up; 
 	int i; 
 
-	
-
-	// To test get_block: Fill blocks 1-10 with some string say "This is block i"
-	// Go through each block and make sure you can see that string. 
 	inodeNumber = 0; 
 	while(inodeNumber == 0)
 	{
@@ -173,8 +170,8 @@ int main()
 		get_block(5, buff); 	// Load block 5 which is where Inodes table begins
 	  
 		
-		ip = (INODE *)buff; 	// Read in root INODE
-		ip++; 			// ip points to root INODE which is inode#2, we don't need SuperBlock, 							GroupDescriptor, etc.
+		ip = (INODE *)buff + 1; 	// Read in root INODE
+		//ip++; 			// ip points to root INODE which is inode#2, we don't need 							SuperBlock, GroupDescriptor, etc.
 		 
 
 		get_block((int)ip->i_block[0], buff);	// Read root->i_block[0] into buff 
@@ -218,10 +215,59 @@ int main()
 			//prints("Searching for "); prints(s); prints("..."); 
 			inodeNumber = get_ino(s, buff);
 		}
+	
+		 
 	}
 
+	// Now we have the inodeNumber of the boot image (mtx)
+	 
+	nextBlock = ((inodeNumber - 1)/8) + 5; 	// Calculate the block # where mtx' data is stored 
+
 	
-	prints("\n\rBooting "); prints(s); 
+	get_block(nextBlock, buff); // Read mtx' data block into buff
+	ip = (INODE *)buff; 
+	ip += (inodeNumber-1)%8;	// ip now points to inode of mtx 
+
+	 
+	get_block((int)ip->i_block[12],buff2);      // Load indirect blocks into buff2
+	
+	//get_block((int)ip->i_block[13],buff3);  // Load the first double indirect block into buff3     
+	 
+	//up = (int*)buff3; 
+
+	//get_block((int)*up, buff3); 
+
+	// Since ES points to 0x1000, get_block at 0 offset will put this all in memory 
+	setes(0x1000);		// Set ES to 0x1000
+	for(i = 0; i<12; i++)
+    	{ 
+		get_block((int)ip->i_block[i],0);
+      		inces();   
+   	}
+	//putc('1'); 
+	
+	up = buff2; 
+	
+	for(i=0; i<256; i++)
+	{
+		get_block(*up, 0); 
+		inces(); 	
+		up++; 
+	}
+
+	return 1; 
+	// inces() - increment ES by 0x40 (1KB)
+
+	// Repeat until MTX has been completely loaded into memory 
+	// (3) Find the disk blocks of the file
+		// i_block[0] to i_block[11] are DIRECT 
+		// i_block[12] are INDIRECT blocks 
+	// (4) Load the disk blocks into memory at segment 0x1000 
+	// (5) return 1 to bs.s for OK, return 0 for failure
+
+	
+	//prints("\n\rBooting "); 
+	//prints(s); 
 
 
 
