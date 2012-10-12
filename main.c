@@ -6,20 +6,20 @@
 #define u32 unsigned long
 
 typedef struct ext2_inode {
-	u16	i_mode;		/* File mode */
-	u16	i_uid;		/* Owner Uid */
-	u32	i_size;		/* Size in bytes */
-	u32	i_atime;	/* Access time */
-	u32	i_ctime;	/* Creation time */
-	u32	i_mtime;	/* Modification time */
-	u32	i_dtime;	/* Deletion Time */
-	u16	i_gid;		/* Group Id */
+	u16	i_mode;			/* File mode */
+	u16	i_uid;			/* Owner Uid */
+	u32	i_size;			/* Size in bytes */
+	u32	i_atime;		/* Access time */
+	u32	i_ctime;		/* Creation time */
+	u32	i_mtime;		/* Modification time */
+	u32	i_dtime;		/* Deletion Time */
+	u16	i_gid;			/* Group Id */
 	u16	i_links_count;	/* Links count */
-	u32	i_blocks;	/* Blocks count */
-	u32	i_flags;	/* File flags */
-        u32     dummy;
+	u32	i_blocks;		/* Blocks count */
+	u32	i_flags;		/* File flags */
+    u32     dummy;
 	u32	i_block[15];    /* Pointers to blocks */
-        u32     pad[7];         /* inode size MUST be 128 bytes */
+    u32     pad[7];    	/* inode size MUST be 128 bytes */
 } INODE;
 
 typedef struct ext2_group_desc
@@ -46,7 +46,18 @@ char* cp;
 INODE* ip;
 DIR *dp;
 
-char* table = "0123456789"; 
+/* Define variables outside of main to save space in a.out */ 
+char buff[1024]; 
+char buff2[1024]; 
+int inodeNumber; 
+int nextBlock; 
+int useDefault = 0; 	// Default: search for 'mtx' in /boot/
+u32* up; 
+int i; 
+char s[24]; 	// the name of the desired boot_file. I.e., mtx for /boot/mtx
+char nameBuff[256];
+//char* table = "0123456789"; 
+
 
 // Recursive driver for printing integers
 //void rprinti(x) int x; 
@@ -91,7 +102,7 @@ void get_block(blk, buff) int blk; char buff[];
 unsigned long get_ino(name, buff) char* name; char buff[]; 
 {
 	int inodeNumber; 
-	char nameBuff[256];
+	//char nameBuff[256];
 	
 
 	inodeNumber = 0; 
@@ -139,22 +150,24 @@ void gets(s) char* s;
 
 void ShowPrompt() void; 
 {
-	//prints("Enter boot image (Press Enter for default MTX): ");  
-	prints("?"); 
+	prints("boot image (enter for MTX): ");  
+	//prints("?"); 
 }
 
 int main()
 {
 	 
-	char s[24]; 	// the name of the desired boot_file. I.e., mtx for /boot/mtx
+	//char s[24]; 	// the name of the desired boot_file. I.e., mtx for /boot/mtx
+	/*
 	int inodeNumber; 
 	int nextBlock; 
 	int useDefault = 0; 	// Default: search for 'mtx' in /boot/
-	char buff[1024]; 
-	char buff2[1024]; 
+	 
+	
 	//char buff3[1024]; 
 	u32* up; 
 	int i; 
+	*/ 
 
 	inodeNumber = 0; 
 	while(inodeNumber == 0)
@@ -187,6 +200,7 @@ int main()
 		} 
 
 		// Do some error checking, make sure the inodeNumber != 0 
+
 		// We have the inodeNumber of the boot directory, use Mailman's algorithm to get block 
 		nextBlock = ((inodeNumber - 1)/8) + 5; 	// Calculate the block # where boot's data is stored 
 					// 
@@ -195,8 +209,8 @@ int main()
 		//printi(nextBlock); 
 
 		get_block(nextBlock, buff); 	// Read boot's data block into buff 
-		ip = (INODE *)buff; 
-		ip += (inodeNumber-1)%8; 
+		ip = (INODE *)buff + (inodeNumber-1)%8; 
+		//ip += (inodeNumber-1)%8; 
 		get_block((int)ip->i_block[0], buff); 
 
 		 
@@ -225,8 +239,8 @@ int main()
 
 	
 	get_block(nextBlock, buff); // Read mtx' data block into buff
-	ip = (INODE *)buff; 
-	ip += (inodeNumber-1)%8;	// ip now points to inode of mtx 
+	ip = (INODE *)buff + (inodeNumber-1)%8; 
+	//ip += (inodeNumber-1)%8;	// ip now points to inode of mtx 
 
 	 
 	get_block((int)ip->i_block[12],buff2);      // Load indirect blocks into buff2
@@ -240,17 +254,21 @@ int main()
 	// Since ES points to 0x1000, get_block at 0 offset will put this all in memory 
 	setes(0x1000);		// Set ES to 0x1000
 	for(i = 0; i<12; i++)
-    	{ 
-		get_block((int)ip->i_block[i],0);
-      		inces();   
+    { 
+    	if(ip->i_block[i] == 0)
+			return 1; 
+		get_block((int)ip->i_block[i],0); ; 
+      	inces();   
    	}
-	//putc('1'); 
 	
 	up = buff2; 
 	
+	/* Read in each block by block in indirect blocks */ 
 	for(i=0; i<256; i++)
 	{
 		get_block(*up, 0); 
+		//if(*up == 0)
+		//	return 1; 
 		inces(); 	
 		up++; 
 	}
